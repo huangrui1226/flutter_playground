@@ -39,7 +39,9 @@ dependencies:
   screenshot: 3.0.0
   get:
   collection:
-  flutter_blue_plus: ^2.0.2
+  flutter_blue_plus: 2.0.2
+  app_settings: 7.0.0
+  permission_handler: 12.0.1
 dev_dependencies:
   flutter_test:
     sdk: flutter

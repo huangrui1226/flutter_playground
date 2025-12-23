@@ -1,7 +1,9 @@
 import 'dart:async';
 
+import 'package:app_settings/app_settings.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_blue_plus/flutter_blue_plus.dart';
+import 'package:permission_handler/permission_handler.dart';
 
 class FlutterBluePlusPage extends StatefulWidget {
   const FlutterBluePlusPage({super.key});
@@ -14,17 +16,20 @@ class _FlutterBluePlusPageState extends State<FlutterBluePlusPage> {
   bool? isSupported;
   List<ScanResult> scanResult = [];
   StreamSubscription? scanSubscription;
+  StreamSubscription? adapterStateSubscription;
+  BluetoothAdapterState state = BluetoothAdapterState.unknown;
 
   @override
   void initState() {
     super.initState();
-    checkSupported();
+    _checkSupported();
   }
 
   @override
   void dispose() {
     FlutterBluePlus.stopScan();
     scanSubscription?.cancel();
+    adapterStateSubscription?.cancel();
     super.dispose();
   }
 
@@ -61,54 +66,50 @@ class _FlutterBluePlusPageState extends State<FlutterBluePlusPage> {
   Widget _supportedView() {
     return StreamBuilder(
       stream: FlutterBluePlus.adapterState,
-      builder: (BuildContext context, AsyncSnapshot<BluetoothAdapterState> snapshot) {
-        if (!snapshot.hasData) {
-          return _loadingView();
-        }
-        final state = snapshot.data;
-        if (state == null) {
-
-        }
-        return Padding(
-          padding: .all(8),
-          child: Column(
-            crossAxisAlignment: .start,
-            children: [
-              Wrap(
+      builder:
+          (
+            BuildContext context,
+            AsyncSnapshot<BluetoothAdapterState> snapshot,
+          ) {
+            if (!snapshot.hasData) {
+              return _loadingView();
+            }
+            final state = snapshot.data;
+            if (state == null) {}
+            return Padding(
+              padding: EdgeInsets.all(8),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  FilledButton.tonal(
-                    onPressed: () {
-                      scanSubscription = FlutterBluePlus.scanResults.listen(
-                        (value) {
-                          setState(() {
-                            scanResult = value;
-                          });
-                        },
-                        onError: (scanError) {
-                          debugPrint('scan error: $scanError');
-                        },
-                      );
-                      FlutterBluePlus.cancelWhenScanComplete(scanSubscription!);
-                      FlutterBluePlus.startScan(
-                        timeout: Duration(seconds: 5),
-                      );
-                    },
-                    child: Text('开始扫描'),
+                  Wrap(
+                    children: [
+                      FilledButton.tonal(
+                        onPressed: _onStartScanTap,
+                        child: Text('开始扫描'),
+                      ),
+                      FilledButton.tonal(
+                        onPressed: _onOpenSettingTap,
+                        child: Text('打开设置'),
+                      ),
+                      FilledButton.tonal(
+                        onPressed: _onRequestBluetooth,
+                        child: Text('获取蓝牙权限'),
+                      ),
+                    ],
+                  ),
+                  Text("device count: ${scanResult.length}"),
+                  Text("bluetooth adapter state: $state"),
+                  Expanded(
+                    child: ListView.separated(
+                      separatorBuilder: (_, _) => Divider(),
+                      itemBuilder: _itemBuilder,
+                      itemCount: scanResult.length,
+                    ),
                   ),
                 ],
               ),
-              Text("device count: ${scanResult.length}"),
-              Expanded(
-                child: ListView.separated(
-                  separatorBuilder: (_, _) => Divider(),
-                  itemBuilder: _itemBuilder,
-                  itemCount: scanResult.length,
-                ),
-              ),
-            ],
-          ),
-        );
-      },
+            );
+          },
     );
   }
 
@@ -118,7 +119,7 @@ class _FlutterBluePlusPageState extends State<FlutterBluePlusPage> {
       children: [
         Expanded(
           child: Column(
-            crossAxisAlignment: .start,
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(result.device.remoteId.str),
               Text(result.device.toString()),
@@ -140,10 +141,75 @@ class _FlutterBluePlusPageState extends State<FlutterBluePlusPage> {
     );
   }
 
-  Future<void> checkSupported() async {
+  void _onOpenSettingTap() {
+    AppSettings.openAppSettings(type: AppSettingsType.bluetooth);
+  }
+
+  void _onRequestBluetooth() {
+    Permission.bluetooth.request();
+  }
+
+  Future<void> _onStartScanTap() async {
+    scanSubscription = FlutterBluePlus.scanResults.listen(
+      _handleScanResult,
+      onError: _handleScanError,
+    );
+    FlutterBluePlus.cancelWhenScanComplete(
+      scanSubscription!,
+    );
+    try {
+      FlutterBluePlus.startScan(
+        timeout: Duration(seconds: 5),
+      );
+    } catch (e) {
+      debugPrint('startScan error: $e');
+    }
+  }
+
+  Future<void> _checkSupported() async {
     final value = await FlutterBluePlus.isSupported;
-    setState(() {
-      isSupported = value;
-    });
+    isSupported = value;
+    debugPrint('isSupported = $isSupported');
+    setState(() {});
+
+    if (isSupported == true || true) {
+      state = FlutterBluePlus.adapterStateNow;
+      debugPrint('state = $state');
+      setState(() {});
+      _listenStateChange();
+    }
+  }
+
+  Future<void> _listenStateChange() async {
+    adapterStateSubscription = FlutterBluePlus.adapterState.listen(
+      _handleBluetoothAdapterStateChanged,
+    );
+  }
+
+  void _handleBluetoothAdapterStateChanged(BluetoothAdapterState value) {
+    if (state == value) {
+      return;
+    }
+    state = value;
+    debugPrint('state = $state');
+    switch (value) {
+      case BluetoothAdapterState.unknown:
+      case BluetoothAdapterState.unavailable:
+      case BluetoothAdapterState.unauthorized:
+      case BluetoothAdapterState.turningOn:
+      case BluetoothAdapterState.on:
+      case BluetoothAdapterState.turningOff:
+      case BluetoothAdapterState.off:
+    }
+    setState(() {});
+  }
+
+  void _handleScanResult(List<ScanResult> result) {
+    scanResult = result;
+    setState(() {});
+  }
+
+  void _handleScanError(scanError) {
+    debugPrint('scan error: $scanError');
   }
 }
