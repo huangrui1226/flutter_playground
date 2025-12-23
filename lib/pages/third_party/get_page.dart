@@ -35,6 +35,6 @@ class GetPage extends StatelessWidget {
 class GetPageController extends GetxController {
   void onFirstOrNullTap() {
     final list1 = <int>[];
-    final n1 = list1.firstOrNull;
+    final _ = list1.firstOrNull;
   }
 }

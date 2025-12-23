@@ -16,41 +16,59 @@ class _ScreenshotPageState extends State<ScreenshotPage> {
 
   @override
   Widget build(BuildContext context) {
+    final list = Column(
+      spacing: 16,
+      children: List.generate(
+        20,
+        (index) => Container(
+          decoration: BoxDecoration(border: .all()),
+          padding: EdgeInsets.all(8),
+          alignment: Alignment.centerLeft,
+          child: Text('index: $index'),
+        ),
+      ),
+    );
     return Scaffold(
+      floatingActionButton: FloatingActionButton(onPressed: () => _offScreenshotTap(list)),
       appBar: AppBar(
         title: Text('Screenshot'),
       ),
-      body: SizedBox(
-        width: double.infinity,
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.center,
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            if (imageData != null) Image.memory(imageData!),
-            FilledButton.tonal(
-              onPressed: _offScreenshotTap,
-              child: Text('离屏截图'),
-            ),
-          ],
+      body: SafeArea(
+        child: SizedBox(
+          width: double.infinity,
+          child: Stack(
+            alignment: .topCenter,
+            children: [
+              Positioned.fill(
+                child: SingleChildScrollView(
+                  padding: .all(16),
+                  child: list,
+                ),
+              ),
+              if (imageData != null)
+                Container(
+                  decoration: BoxDecoration(border: Border.all()),
+                  child: Image.memory(imageData!),
+                ),
+            ],
+          ),
         ),
       ),
     );
   }
 
-  Future<void> _offScreenshotTap() async {
+  Future<void> _offScreenshotTap(Widget child) async {
+    if (imageData != null) {
+      imageData = null;
+      setState(() {});
+      return;
+    }
     final result = await controller.captureFromLongWidget(
       InheritedTheme.captureAll(
         context,
         Material(
           child: Builder(
-            builder: (context) {
-              return Column(
-                children: List.generate(
-                  20,
-                  (index) => Text('index: $index'),
-                ),
-              );
-            },
+            builder: (context) => child,
           ),
         ),
       ),
