@@ -3,6 +3,8 @@ PODS:
     - Flutter
   - audio_waveforms (0.0.1):
     - Flutter
+  - connectivity_plus (0.0.1):
+    - Flutter
   - Flutter (1.0.0)
   - flutter_blue_plus_darwin (0.0.2):
     - Flutter
@@ -13,6 +15,7 @@ PODS:
 DEPENDENCIES:
   - app_settings (from `.symlinks/plugins/app_settings/ios`)
   - audio_waveforms (from `.symlinks/plugins/audio_waveforms/ios`)
+  - connectivity_plus (from `.symlinks/plugins/connectivity_plus/ios`)
   - Flutter (from `Flutter`)
   - flutter_blue_plus_darwin (from `.symlinks/plugins/flutter_blue_plus_darwin/darwin`)
   - permission_handler_apple (from `.symlinks/plugins/permission_handler_apple/ios`)
@@ -22,6 +25,8 @@ EXTERNAL SOURCES:
     :path: ".symlinks/plugins/app_settings/ios"
   audio_waveforms:
     :path: ".symlinks/plugins/audio_waveforms/ios"
+  connectivity_plus:
+    :path: ".symlinks/plugins/connectivity_plus/ios"
   Flutter:
     :path: Flutter
   flutter_blue_plus_darwin:
@@ -32,6 +37,7 @@ EXTERNAL SOURCES:
 SPEC CHECKSUMS:
   app_settings: 0341ec6daa4f0c50f5a421bf0ad7c36084db6e90
   audio_waveforms: a6dde7fe7c0ea05f06ffbdb0f7c1b2b2ba6cedcf
+  connectivity_plus: cb623214f4e1f6ef8fe7403d580fdad517d2f7dd
   Flutter: cabc95a1d2626b1b06e7179b784ebcf0c0cde467
   flutter_blue_plus_darwin: 20a08bfeaa0f7804d524858d3d8744bcc1b6dbc3
   permission_handler_apple: 4ed2196e43d0651e8ff7ca3483a069d469701f2d

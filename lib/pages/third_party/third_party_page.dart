@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_playground/pages/third_party/audio_wave_page.dart';
+import 'package:flutter_playground/pages/third_party/connectivity_plus_page.dart';
 import 'package:flutter_playground/pages/third_party/flutter_blue_plus_page.dart';
 import 'package:flutter_playground/pages/third_party/get_page.dart';
 import 'package:flutter_playground/pages/third_party/screenshot_page.dart';
@@ -54,6 +55,15 @@ class ThirdPartyPage extends StatelessWidget {
           title: Text('flutter_blue_plus'),
           onTap: () {
             final destination = FlutterBluePlusPage();
+            final route = MaterialPageRoute(builder: (context) => destination);
+            Navigator.push(context, route);
+          },
+        );
+      case 4:
+        return ListTile(
+          title: Text('connectivity_plus'),
+          onTap: () {
+            final destination = ConnectivityPlusPage();
             final route = MaterialPageRoute(builder: (context) => destination);
             Navigator.push(context, route);
           },
