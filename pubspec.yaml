@@ -43,6 +43,7 @@ dependencies:
   app_settings: 7.0.0
   permission_handler: 12.0.1
   connectivity_plus: 7.0.0
+  flutter_inappwebview: 6.1.5
 dev_dependencies:
   flutter_test:
     sdk: flutter
