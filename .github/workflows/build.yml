@@ -1,0 +1,23 @@
+name: build
+run-name: ${{ github.actor }} is building 🚀
+on:
+  workflow_dispatch:
+    inputs:
+      changelog:
+        description: '更新说明'
+        required: true
+        default: '- 功能优化和问题修复'
+        type: string
+jobs:
+  build-ios:
+    runs-on: self-hosted
+    steps:
+      - name: Test
+        run: |
+          echo build ios
+  build-android:
+    runs-on: self-hosted
+    steps:
+      - name: Test
+        run: |
+          echo build android
