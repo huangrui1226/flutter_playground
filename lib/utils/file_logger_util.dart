@@ -103,6 +103,45 @@ class FileLoggerUtil {
     _logCrashSync('UncaughtError: $error\n$stack');
   }
 
+  /// 只保留最新的日志文件，其他的删除
+  Future<void> keepLatestLog() async {
+    if (currentLogPath == null) {
+      return;
+    }
+    final logsDir = Directory(currentLogPath!);
+    try {
+      final entities = await logsDir.list().toList();
+      final logFiles = <File>[];
+      for (final entity in entities) {
+        if (entity is File && entity.path.endsWith('.txt')) {
+          logFiles.add(entity);
+        }
+      }
+      if (logFiles.length <= 1) return;
+
+      logFiles.sort((a, b) {
+        final aStat = a.statSync().modified;
+        final bStat = b.statSync().modified;
+        return bStat.compareTo(aStat);
+      });
+
+      final latestPath = _file?.path ?? logFiles.first.path;
+      for (final file in logFiles) {
+        if (file.path == latestPath) continue;
+        try {
+          await file.delete();
+          debugPrint(
+            '[AppFileLogger] 已删除旧日志: ${file.path.split('/').last}',
+          );
+        } catch (e) {
+          debugPrint('[AppFileLogger] 删除日志失败: ${file.path} -> $e');
+        }
+      }
+    } catch (e) {
+      debugPrint('[AppFileLogger] 保留最新日志失败: $e');
+    }
+  }
+
   /// 同步写入崩溃日志，确保 app 终止前数据落盘
   void _logCrashSync(String message) {
     debugPrint(message);
@@ -132,9 +171,7 @@ class FileLoggerUtil {
       final threshold = DateTime.now().subtract(const Duration(days: 3));
       final entities = await logsDir.list().toList();
       for (final entity in entities) {
-        if (entity is File &&
-            entity.path.endsWith('.txt') &&
-            entity.path != _file?.path) {
+        if (entity is File && entity.path.endsWith('.txt') && entity.path != _file?.path) {
           final stat = await entity.stat();
           if (stat.modified.isBefore(threshold)) {
             await entity.delete();
