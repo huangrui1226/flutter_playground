@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_playground/pages/convert/convert_page.dart';
-import 'package:flutter_playground/pages/third_party/third_party_page.dart';
+
+import 'convert/convert_page.dart';
+import 'third_party/third_party_page.dart';
+import 'utils/utils_page.dart';
 
 class HomePage extends StatelessWidget {
   const HomePage({super.key});
@@ -13,7 +15,7 @@ class HomePage extends StatelessWidget {
       ),
       body: ListView.builder(
         itemBuilder: _itemBuilder,
-        itemCount: 2,
+        itemCount: 3,
       ),
     );
   }
@@ -34,6 +36,15 @@ class HomePage extends StatelessWidget {
           title: Text('Convert'),
           onTap: () {
             final destination = ConvertPage();
+            final route = MaterialPageRoute(builder: (context) => destination);
+            Navigator.push(context, route);
+          },
+        );
+      case 2:
+        return ListTile(
+          title: Text('Utils'),
+          onTap: () {
+            final destination = UtilsPage();
             final route = MaterialPageRoute(builder: (context) => destination);
             Navigator.push(context, route);
           },
