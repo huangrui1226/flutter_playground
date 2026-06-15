@@ -14,10 +14,10 @@ jobs:
     steps:
       - name: Test
         run: |
-          echo build ios develop
+          echo build ios develop runner
   build-android:
     runs-on: self-hosted
     steps:
       - name: Test
         run: |
-          echo build android develop
+          echo build android develop runner
