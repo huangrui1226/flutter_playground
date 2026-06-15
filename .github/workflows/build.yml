@@ -32,18 +32,18 @@ jobs:
           fvm flutter pub get
           fvm flutter build ipa --release --export-method app-store
 
-          mapfile -t IPA_FILES < <(find build/ios/ipa -name "*.ipa" -type f)
-          if [ "${#IPA_FILES[@]}" -eq 0 ]; then
+          IPA_COUNT=$(find build/ios/ipa -name "*.ipa" -type f | wc -l | tr -d ' ')
+          if [ "$IPA_COUNT" -eq 0 ]; then
             echo "IPA file not found under build/ios/ipa"
             exit 1
           fi
-          if [ "${#IPA_FILES[@]}" -gt 1 ]; then
-            echo "Expected exactly one IPA file, found ${#IPA_FILES[@]}:"
-            printf '%s\n' "${IPA_FILES[@]}"
+          if [ "$IPA_COUNT" -gt 1 ]; then
+            echo "Expected exactly one IPA file, found $IPA_COUNT:"
+            find build/ios/ipa -name "*.ipa" -type f
             exit 1
           fi
 
-          IPA_PATH="${IPA_FILES[0]}"
+          IPA_PATH=$(find build/ios/ipa -name "*.ipa" -type f | head -n 1)
           echo "Built IPA: $IPA_PATH"
 
           echo "IPA_PATH=$IPA_PATH" >> "$GITHUB_ENV"
