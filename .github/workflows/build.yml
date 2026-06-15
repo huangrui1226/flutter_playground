@@ -40,6 +40,8 @@ jobs:
 
       - name: Upload iOS IPA to TestFlight
         run: |
+          set -euo pipefail
+
           if [ -z "$ASC_API_KEY_ID" ] || [ -z "$ASC_API_ISSUER_ID" ] || [ -z "$ASC_API_PRIVATE_KEY_BASE64" ]; then
             echo "Missing App Store Connect secrets: ASC_API_KEY_ID, ASC_API_ISSUER_ID, ASC_API_PRIVATE_KEY_BASE64"
             exit 1
@@ -121,29 +123,52 @@ jobs:
           PY
           )
 
-          curl -sS -G "https://api.appstoreconnect.apple.com/v1/builds" \
-            -H "Authorization: Bearer $ASC_JWT" \
-            --data-urlencode "filter[app]=$ASC_APP_ID" \
-            --data-urlencode "filter[version]=$IPA_BUILD_NUMBER" \
-            --data-urlencode "limit=1" \
-            -o asc-builds.json
-
-          DUPLICATE_BUILD_COUNT=$(python3 - <<'PY'
+          export ASC_JWT ASC_APP_ID IPA_BUILD_NUMBER
+          BLOCKING_BUILD_NUMBER=$(python3 - <<'PY'
           import json
+          import os
+          import urllib.parse
+          import urllib.request
 
-          with open("asc-builds.json", encoding="utf-8") as f:
-              response = json.load(f)
+          def parse_build_number(value):
+              value = str(value)
+              if not value.isdigit():
+                  raise SystemExit(f"Unsupported App Store Connect build number format, expected integer: {value}")
+              return int(value)
 
-          if "errors" in response:
-              raise SystemExit(f"Failed to check App Store Connect builds: {response}")
+          current = parse_build_number(os.environ["IPA_BUILD_NUMBER"])
+          params = urllib.parse.urlencode({
+              "filter[app]": os.environ["ASC_APP_ID"],
+              "limit": "200",
+          })
+          url = f"https://api.appstoreconnect.apple.com/v1/builds?{params}"
+          headers = {"Authorization": f"Bearer {os.environ['ASC_JWT']}"}
 
-          print(len(response.get("data", [])))
+          while url:
+              req = urllib.request.Request(url, headers=headers)
+              with urllib.request.urlopen(req) as resp:
+                  response = json.loads(resp.read().decode("utf-8"))
+
+              if "errors" in response:
+                  raise SystemExit(f"Failed to check App Store Connect builds: {response}")
+
+              for build in response.get("data", []):
+                  existing_value = build.get("attributes", {}).get("version")
+                  if existing_value is None:
+                      continue
+
+                  existing = parse_build_number(existing_value)
+                  if existing >= current:
+                      print(existing_value)
+                      raise SystemExit(0)
+
+              url = response.get("links", {}).get("next")
           PY
           )
 
-          if [ "$DUPLICATE_BUILD_COUNT" != "0" ]; then
-            echo "Build number already exists in App Store Connect: $IPA_BUILD_NUMBER"
-            echo "Please update pubspec.yaml version build number to match Android before uploading."
+          if [ -n "$BLOCKING_BUILD_NUMBER" ]; then
+            echo "App Store Connect already has build number $BLOCKING_BUILD_NUMBER, which is greater than or equal to current build number $IPA_BUILD_NUMBER."
+            echo "Please update pubspec.yaml version build number to a larger value and keep it aligned with Android before uploading."
             exit 1
           fi
 
