@@ -46,6 +46,7 @@ dependencies:
   flutter_inappwebview:
   path_provider:
   dio:
+  display_metrics:
 
 dev_dependencies:
   flutter_test:
