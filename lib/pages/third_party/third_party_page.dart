@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import 'audio_wave_page.dart';
 import 'connectivity_plus_page.dart';
+import 'display_metrics_page.dart';
 import 'flutter_blue_plus_page.dart';
 import 'flutter_inappwebview_page.dart';
 import 'get_page.dart';
@@ -18,7 +19,7 @@ class ThirdPartyPage extends StatelessWidget {
       ),
       body: ListView.builder(
         itemBuilder: _itemBuilder,
-        itemCount: 6,
+        itemCount: 7,
       ),
     );
   }
@@ -75,6 +76,15 @@ class ThirdPartyPage extends StatelessWidget {
           title: Text('flutter_inappwebview'),
           onTap: () {
             final destination = FlutterInappwebviewPage();
+            final route = MaterialPageRoute(builder: (context) => destination);
+            Navigator.push(context, route);
+          },
+        );
+      case 6:
+        return ListTile(
+          title: Text('display_metrics'),
+          onTap: () {
+            final destination = DisplayMetricsPage();
             final route = MaterialPageRoute(builder: (context) => destination);
             Navigator.push(context, route);
           },
