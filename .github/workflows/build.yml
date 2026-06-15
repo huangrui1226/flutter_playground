@@ -27,8 +27,6 @@ jobs:
           echo build ios develop runner
       - name: Build iOS IPA for TestFlight
         run: |
-          rm -rf build/ios/archive build/ios/ipa
-
           fvm flutter pub get
           fvm flutter build ipa --release --export-method app-store
 
@@ -76,20 +74,43 @@ jobs:
 
           export API_PRIVATE_KEYS_DIR="$PRIVATE_KEYS_DIR"
 
-          IPA_INFO_DIR="$RUNNER_TEMP/ipa-info"
-          rm -rf "$IPA_INFO_DIR"
-          mkdir -p "$IPA_INFO_DIR"
-          unzip -q "$IPA_PATH" "Payload/*.app/Info.plist" -d "$IPA_INFO_DIR"
-          APP_INFO_PLIST=$(find "$IPA_INFO_DIR/Payload" -name Info.plist -type f | head -n 1)
-          if [ -z "$APP_INFO_PLIST" ]; then
-            echo "Info.plist not found in IPA: $IPA_PATH"
+          IOS_BUNDLE_ID=$(python3 - <<'PY'
+          import re
+
+          with open("ios/Runner.xcodeproj/project.pbxproj", encoding="utf-8") as f:
+              content = f.read()
+
+          bundle_ids = re.findall(r"PRODUCT_BUNDLE_IDENTIFIER = ([^;]+);", content)
+          app_bundle_ids = [bundle_id.strip() for bundle_id in bundle_ids if not bundle_id.strip().endswith(".RunnerTests")]
+          if not app_bundle_ids:
+              raise SystemExit("PRODUCT_BUNDLE_IDENTIFIER not found in ios/Runner.xcodeproj/project.pbxproj")
+
+          print(app_bundle_ids[0])
+          PY
+          )
+
+          PUBSPEC_VERSION=$(python3 - <<'PY'
+          import re
+
+          with open("pubspec.yaml", encoding="utf-8") as f:
+              for line in f:
+                  match = re.match(r"^version:\s*([^\s#]+)", line)
+                  if match:
+                      print(match.group(1))
+                      break
+              else:
+                  raise SystemExit("version not found in pubspec.yaml")
+          PY
+          )
+
+          PUBSPEC_MARKETING_VERSION="${PUBSPEC_VERSION%%+*}"
+          PUBSPEC_BUILD_NUMBER="${PUBSPEC_VERSION##*+}"
+          if [ "$PUBSPEC_VERSION" = "$PUBSPEC_BUILD_NUMBER" ]; then
+            echo "pubspec.yaml version must include a build number, for example: version: 1.0.0+5"
             exit 1
           fi
 
-          IPA_BUNDLE_ID=$(/usr/libexec/PlistBuddy -c "Print :CFBundleIdentifier" "$APP_INFO_PLIST")
-          IPA_MARKETING_VERSION=$(/usr/libexec/PlistBuddy -c "Print :CFBundleShortVersionString" "$APP_INFO_PLIST")
-          IPA_BUILD_NUMBER=$(/usr/libexec/PlistBuddy -c "Print :CFBundleVersion" "$APP_INFO_PLIST")
-          echo "Checking App Store Connect build number: bundle_id=$IPA_BUNDLE_ID version=$IPA_MARKETING_VERSION build_number=$IPA_BUILD_NUMBER"
+          echo "Checking App Store Connect build number: bundle_id=$IOS_BUNDLE_ID version=$PUBSPEC_MARKETING_VERSION build_number=$PUBSPEC_BUILD_NUMBER"
 
           ASC_JWT=$(ruby -ropenssl -rjson -rbase64 -rdigest -e '
             def b64url(value)
@@ -116,7 +137,7 @@ jobs:
 
           curl -sS -G "https://api.appstoreconnect.apple.com/v1/apps" \
             -H "Authorization: Bearer $ASC_JWT" \
-            --data-urlencode "filter[bundleId]=$IPA_BUNDLE_ID" \
+            --data-urlencode "filter[bundleId]=$IOS_BUNDLE_ID" \
             --data-urlencode "limit=1" \
             -o asc-apps.json
 
@@ -134,7 +155,7 @@ jobs:
           PY
           )
 
-          export ASC_JWT ASC_APP_ID IPA_MARKETING_VERSION IPA_BUILD_NUMBER
+          export ASC_JWT ASC_APP_ID PUBSPEC_MARKETING_VERSION PUBSPEC_BUILD_NUMBER
           python3 - <<'PY'
           import json
           import os
@@ -162,7 +183,7 @@ jobs:
               params = urllib.parse.urlencode({
                   "filter[app]": os.environ["ASC_APP_ID"],
                   "filter[platform]": "IOS",
-                  "filter[version]": os.environ["IPA_MARKETING_VERSION"],
+                  "filter[version]": os.environ["PUBSPEC_MARKETING_VERSION"],
                   "limit": "1",
               })
               url = f"https://api.appstoreconnect.apple.com/v1/preReleaseVersions?{params}"
@@ -188,7 +209,7 @@ jobs:
               return uploaded_build_numbers
 
           def show_current_and_uploaded_versions():
-              current_build_number = parse_build_number(os.environ["IPA_BUILD_NUMBER"])
+              current_build_number = parse_build_number(os.environ["PUBSPEC_BUILD_NUMBER"])
               headers = {"Authorization": f"Bearer {os.environ['ASC_JWT']}"}
 
               pre_release_version_id = get_ios_pre_release_version_id(headers)
