@@ -20,6 +20,7 @@ jobs:
       ASC_API_KEY_ID: ${{ secrets.ASC_API_KEY_ID }}
       ASC_API_ISSUER_ID: ${{ secrets.ASC_API_ISSUER_ID }}
       ASC_API_PRIVATE_KEY_BASE64: ${{ secrets.ASC_API_PRIVATE_KEY_BASE64 }}
+      ASC_APPLE_ID: ${{ secrets.ASC_APPLE_ID }}
     steps:
       - uses: actions/checkout@v4
       - name: Test
@@ -27,6 +28,8 @@ jobs:
           echo build ios develop runner
       - name: Build iOS IPA for TestFlight
         run: |
+          rm -rf build/ios/archive build/ios/ipa
+
           fvm flutter pub get
           fvm flutter build ipa --release --export-method app-store
 
@@ -46,7 +49,7 @@ jobs:
 
           echo "IPA_PATH=$IPA_PATH" >> "$GITHUB_ENV"
 
-      - name: Print iOS IPA and TestFlight build numbers
+      - name: Validate and upload iOS IPA to TestFlight
         run: |
           set -euo pipefail
 
@@ -215,11 +218,15 @@ jobs:
               pre_release_version_id = get_ios_pre_release_version_id(headers)
               if pre_release_version_id is None:
                   print(f"current ipa build: {current_build_number}, Uploaded build number: none, should upload: yes")
+                  with open("should-upload.txt", "w", encoding="utf-8") as f:
+                      f.write("yes")
                   return
 
               uploaded_build_numbers = get_uploaded_build_numbers(pre_release_version_id, headers)
               if not uploaded_build_numbers:
                   print(f"current ipa build: {current_build_number}, Uploaded build number: none, should upload: yes")
+                  with open("should-upload.txt", "w", encoding="utf-8") as f:
+                      f.write("yes")
                   return
 
               uploaded_max_build_number = max(parse_build_number(build_number) for build_number in uploaded_build_numbers)
@@ -229,9 +236,32 @@ jobs:
                   f"Uploaded build number: {uploaded_max_build_number}, "
                   f"should upload: {should_upload}"
               )
+              with open("should-upload.txt", "w", encoding="utf-8") as f:
+                  f.write(should_upload)
 
           show_current_and_uploaded_versions()
           PY
+
+          SHOULD_UPLOAD=$(cat should-upload.txt)
+          if [ "$SHOULD_UPLOAD" != "yes" ]; then
+            echo "Skip TestFlight upload because pubspec.yaml build number is not greater than the uploaded TestFlight build number."
+            exit 1
+          fi
+
+          if [ -n "${ASC_APPLE_ID:-}" ]; then
+            xcrun altool --upload-app \
+              --type ios \
+              --file "$IPA_PATH" \
+              --apple-id "$ASC_APPLE_ID" \
+              --api-key "$ASC_API_KEY_ID" \
+              --api-issuer "$ASC_API_ISSUER_ID"
+          else
+            xcrun altool --upload-app \
+              --type ios \
+              --file "$IPA_PATH" \
+              --api-key "$ASC_API_KEY_ID" \
+              --api-issuer "$ASC_API_ISSUER_ID"
+          fi
   build-android:
     runs-on: self-hosted
     env:
