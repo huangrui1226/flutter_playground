@@ -8,19 +8,199 @@ on:
         required: true
         default: '- 功能优化和问题修复'
         type: string
+      pgyer_file_path:
+        description: '上传到蒲公英的安装包路径'
+        required: true
+        default: 'build/app/outputs/flutter-apk/app-debug.apk'
+        type: string
 jobs:
   build-ios:
     runs-on: self-hosted
+    env:
+      ASC_API_KEY_ID: ${{ secrets.ASC_API_KEY_ID }}
+      ASC_API_ISSUER_ID: ${{ secrets.ASC_API_ISSUER_ID }}
+      ASC_API_PRIVATE_KEY_BASE64: ${{ secrets.ASC_API_PRIVATE_KEY_BASE64 }}
     steps:
+      - uses: actions/checkout@v4
       - name: Test
         run: |
           echo build ios develop runner
+      - name: Build iOS IPA for TestFlight
+        run: |
+          fvm flutter pub get
+          fvm flutter build ipa --release --export-method app-store
+
+          IPA_PATH=$(find build/ios/ipa -name "*.ipa" -type f | head -n 1)
+          if [ -z "$IPA_PATH" ]; then
+            echo "IPA file not found under build/ios/ipa"
+            exit 1
+          fi
+
+          echo "IPA_PATH=$IPA_PATH" >> "$GITHUB_ENV"
+
+      - name: Upload iOS IPA to TestFlight
+        run: |
+          if [ -z "$ASC_API_KEY_ID" ] || [ -z "$ASC_API_ISSUER_ID" ] || [ -z "$ASC_API_PRIVATE_KEY_BASE64" ]; then
+            echo "Missing App Store Connect secrets: ASC_API_KEY_ID, ASC_API_ISSUER_ID, ASC_API_PRIVATE_KEY_BASE64"
+            exit 1
+          fi
+
+          PRIVATE_KEYS_DIR="$RUNNER_TEMP/appstoreconnect/private_keys"
+          mkdir -p "$PRIVATE_KEYS_DIR"
+
+          python3 - <<'PY'
+          import base64
+          import os
+
+          key_id = os.environ["ASC_API_KEY_ID"]
+          key_base64 = os.environ["ASC_API_PRIVATE_KEY_BASE64"]
+          private_keys_dir = os.path.join(os.environ["RUNNER_TEMP"], "appstoreconnect", "private_keys")
+          os.makedirs(private_keys_dir, exist_ok=True)
+
+          key_path = os.path.join(private_keys_dir, f"AuthKey_{key_id}.p8")
+          with open(key_path, "wb") as f:
+              f.write(base64.b64decode(key_base64))
+          PY
+
+          export API_PRIVATE_KEYS_DIR="$PRIVATE_KEYS_DIR"
+          xcrun altool --upload-app \
+            --type ios \
+            --file "$IPA_PATH" \
+            --apiKey "$ASC_API_KEY_ID" \
+            --apiIssuer "$ASC_API_ISSUER_ID"
   build-android:
     runs-on: self-hosted
+    env:
+      PGYER_API_KEY: ${{ secrets.PGYER_API_KEY }}
+    outputs:
+      pgyer_url: ${{ steps.wait-pgyer.outputs.pgyer_url }}
+      pgyer_qrcode_url: ${{ steps.wait-pgyer.outputs.pgyer_qrcode_url }}
     steps:
+      - uses: actions/checkout@v4
       - name: Test
         run: |
           echo build android develop runner
+      - name: Get Pgyer upload token
+        id: get-pgyer-token
+        if: env.PGYER_API_KEY != ''
+        env:
+          PACKAGE_PATH: ${{ github.event.inputs.pgyer_file_path }}
+          CHANGELOG: ${{ github.event.inputs.changelog }}
+        run: |
+          if [ ! -f "$PACKAGE_PATH" ]; then
+            echo "Package file not found: $PACKAGE_PATH"
+            exit 1
+          fi
+
+          case "$PACKAGE_PATH" in
+            *.apk) BUILD_TYPE="apk" ;;
+            *.ipa) BUILD_TYPE="ipa" ;;
+            *)
+              echo "Pgyer only supports apk or ipa files: $PACKAGE_PATH"
+              exit 1
+              ;;
+          esac
+
+          curl -sS -X POST "https://www.pgyer.com/apiv2/app/getCOSToken" \
+            --data-urlencode "_api_key=$PGYER_API_KEY" \
+            --data-urlencode "buildType=$BUILD_TYPE" \
+            --data-urlencode "buildInstallType=1" \
+            --data-urlencode "buildUpdateDescription=$CHANGELOG" \
+            -o pgyer-token.json
+
+          python3 - <<'PY'
+          import json
+          import os
+
+          with open("pgyer-token.json", encoding="utf-8") as f:
+              response = json.load(f)
+
+          if response.get("code") != 0:
+              raise SystemExit(f"Failed to get Pgyer upload token: {response}")
+
+          data = response["data"]
+          params = data["params"]
+          outputs = {
+              "endpoint": data["endpoint"],
+              "build_key": data["key"],
+              "key": params["key"],
+              "signature": params["signature"],
+              "security_token": params["x-cos-security-token"],
+          }
+
+          with open(os.environ["GITHUB_OUTPUT"], "a", encoding="utf-8") as f:
+              for name, value in outputs.items():
+                  f.write(f"{name}={value}\n")
+          PY
+
+      - name: Upload package to Pgyer
+        if: steps.get-pgyer-token.outputs.endpoint != ''
+        env:
+          PACKAGE_PATH: ${{ github.event.inputs.pgyer_file_path }}
+          PGYER_ENDPOINT: ${{ steps.get-pgyer-token.outputs.endpoint }}
+          PGYER_KEY: ${{ steps.get-pgyer-token.outputs.key }}
+          PGYER_SIGNATURE: ${{ steps.get-pgyer-token.outputs.signature }}
+          PGYER_SECURITY_TOKEN: ${{ steps.get-pgyer-token.outputs.security_token }}
+        run: |
+          HTTP_CODE=$(curl -sS -o pgyer-upload-response.txt -w "%{http_code}" \
+            -X POST "$PGYER_ENDPOINT" \
+            -F "key=$PGYER_KEY" \
+            -F "signature=$PGYER_SIGNATURE" \
+            -F "x-cos-security-token=$PGYER_SECURITY_TOKEN" \
+            -F "x-cos-meta-file-name=$(basename "$PACKAGE_PATH")" \
+            -F "file=@$PACKAGE_PATH")
+
+          if [ "$HTTP_CODE" != "204" ]; then
+            echo "Failed to upload package to Pgyer, HTTP status: $HTTP_CODE"
+            cat pgyer-upload-response.txt
+            exit 1
+          fi
+
+      - name: Wait for Pgyer publish result
+        id: wait-pgyer
+        if: steps.get-pgyer-token.outputs.build_key != ''
+        env:
+          PGYER_API_KEY: ${{ secrets.PGYER_API_KEY }}
+          PGYER_BUILD_KEY: ${{ steps.get-pgyer-token.outputs.build_key }}
+        run: |
+          for i in $(seq 1 30); do
+            curl -sS -G "https://www.pgyer.com/apiv2/app/buildInfo" \
+              --data-urlencode "_api_key=$PGYER_API_KEY" \
+              --data-urlencode "buildKey=$PGYER_BUILD_KEY" \
+              -o pgyer-build-info.json
+
+            CODE=$(python3 -c 'import json; print(json.load(open("pgyer-build-info.json")).get("code"))')
+            if [ "$CODE" = "0" ]; then
+              python3 - <<'PY'
+              import json
+              import os
+
+              with open("pgyer-build-info.json", encoding="utf-8") as f:
+                  response = json.load(f)
+
+              data = response["data"]
+              shortcut = data.get("buildShortcutUrl", "")
+              install_url = f"https://www.pgyer.com/{shortcut}" if shortcut else ""
+              qrcode_url = data.get("buildQRCodeURL", "")
+
+              with open(os.environ["GITHUB_OUTPUT"], "a", encoding="utf-8") as f:
+                  f.write(f"pgyer_url={install_url}\n")
+                  f.write(f"pgyer_qrcode_url={qrcode_url}\n")
+              PY
+              exit 0
+            fi
+
+            if [ "$CODE" != "1247" ]; then
+              echo "Pgyer publish failed:"
+              cat pgyer-build-info.json
+              exit 1
+            fi
+
+            sleep 5
+          done
+
+          echo "Timed out waiting for Pgyer publish result"
+          exit 1
   notify-feishu:
     name: Notify Feishu
     runs-on: self-hosted
@@ -33,6 +213,8 @@ jobs:
       FEISHU_BOT_SECRET: ${{ secrets.FEISHU_BOT_SECRET }}
       IOS_RESULT: ${{ needs.build-ios.result }}
       ANDROID_RESULT: ${{ needs.build-android.result }}
+      PGYER_URL: ${{ needs.build-android.outputs.pgyer_url }}
+      PGYER_QRCODE_URL: ${{ needs.build-android.outputs.pgyer_qrcode_url }}
       CHANGELOG: ${{ github.event.inputs.changelog }}
       WORKFLOW_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
       REPOSITORY: ${{ github.repository }}
@@ -73,6 +255,7 @@ jobs:
               f"**触发人**：{os.environ['ACTOR']}\n"
               f"**iOS**：{os.environ['IOS_RESULT']}\n"
               f"**Android**：{os.environ['ANDROID_RESULT']}\n"
+              f"**蒲公英**：{os.environ['PGYER_URL'] or '未上传'}\n"
               f"**更新说明**：\n{os.environ['CHANGELOG']}"
           )
           payload = {
