@@ -27,18 +27,28 @@ jobs:
           echo build ios develop runner
       - name: Build iOS IPA for TestFlight
         run: |
+          rm -rf build/ios/archive build/ios/ipa
+
           fvm flutter pub get
           fvm flutter build ipa --release --export-method app-store
 
-          IPA_PATH=$(find build/ios/ipa -name "*.ipa" -type f | head -n 1)
-          if [ -z "$IPA_PATH" ]; then
+          mapfile -t IPA_FILES < <(find build/ios/ipa -name "*.ipa" -type f)
+          if [ "${#IPA_FILES[@]}" -eq 0 ]; then
             echo "IPA file not found under build/ios/ipa"
             exit 1
           fi
+          if [ "${#IPA_FILES[@]}" -gt 1 ]; then
+            echo "Expected exactly one IPA file, found ${#IPA_FILES[@]}:"
+            printf '%s\n' "${IPA_FILES[@]}"
+            exit 1
+          fi
+
+          IPA_PATH="${IPA_FILES[0]}"
+          echo "Built IPA: $IPA_PATH"
 
           echo "IPA_PATH=$IPA_PATH" >> "$GITHUB_ENV"
 
-      - name: Upload iOS IPA to TestFlight
+      - name: Print iOS IPA and TestFlight build numbers
         run: |
           set -euo pipefail
 
@@ -125,12 +135,22 @@ jobs:
           )
 
           export ASC_JWT ASC_APP_ID IPA_MARKETING_VERSION IPA_BUILD_NUMBER
-          BLOCKING_BUILD_NUMBER=$(python3 - <<'PY'
+          python3 - <<'PY'
           import json
           import os
           import sys
           import urllib.parse
           import urllib.request
+
+          def request_json(url, headers):
+              req = urllib.request.Request(url, headers=headers)
+              with urllib.request.urlopen(req) as resp:
+                  response = json.loads(resp.read().decode("utf-8"))
+
+              if "errors" in response:
+                  raise SystemExit(f"App Store Connect API request failed: {response}")
+
+              return response
 
           def parse_build_number(value):
               value = str(value)
@@ -138,74 +158,79 @@ jobs:
                   raise SystemExit(f"Unsupported App Store Connect build number format, expected integer: {value}")
               return int(value)
 
-          current = parse_build_number(os.environ["IPA_BUILD_NUMBER"])
-          params = urllib.parse.urlencode({
-              "filter[app]": os.environ["ASC_APP_ID"],
-              "filter[platform]": "IOS",
-              "filter[version]": os.environ["IPA_MARKETING_VERSION"],
-              "limit": "1",
-          })
-          url = f"https://api.appstoreconnect.apple.com/v1/preReleaseVersions?{params}"
-          headers = {"Authorization": f"Bearer {os.environ['ASC_JWT']}"}
+          def get_ios_pre_release_version_id(headers):
+              params = urllib.parse.urlencode({
+                  "filter[app]": os.environ["ASC_APP_ID"],
+                  "filter[platform]": "IOS",
+                  "filter[version]": os.environ["IPA_MARKETING_VERSION"],
+                  "limit": "1",
+              })
+              url = f"https://api.appstoreconnect.apple.com/v1/preReleaseVersions?{params}"
+              response = request_json(url, headers)
+              versions = response.get("data", [])
+              return versions[0]["id"] if versions else None
 
-          req = urllib.request.Request(url, headers=headers)
-          with urllib.request.urlopen(req) as resp:
-              response = json.loads(resp.read().decode("utf-8"))
+          def get_uploaded_build_numbers(pre_release_version_id, headers):
+              uploaded_build_numbers = []
+              params = urllib.parse.urlencode({"limit": "200"})
+              url = f"https://api.appstoreconnect.apple.com/v1/preReleaseVersions/{pre_release_version_id}/builds?{params}"
 
-          if "errors" in response:
-              raise SystemExit(f"Failed to check App Store Connect pre-release versions: {response}")
+              while url:
+                  response = request_json(url, headers)
 
-          versions = response.get("data", [])
-          if not versions:
+                  for build in response.get("data", []):
+                      build_number = build.get("attributes", {}).get("version")
+                      if build_number is not None:
+                          uploaded_build_numbers.append(build_number)
+
+                  url = response.get("links", {}).get("next")
+
+              return uploaded_build_numbers
+
+          def show_current_and_uploaded_versions():
+              current_build_number = parse_build_number(os.environ["IPA_BUILD_NUMBER"])
+              headers = {"Authorization": f"Bearer {os.environ['ASC_JWT']}"}
+
               print(
-                  f"No App Store Connect iOS pre-release version found for version {os.environ['IPA_MARKETING_VERSION']}.",
+                  "Current IPA version: "
+                  f"{os.environ['IPA_MARKETING_VERSION']} "
+                  f"build {os.environ['IPA_BUILD_NUMBER']}",
                   file=sys.stderr,
               )
-              raise SystemExit(0)
 
-          pre_release_version_id = versions[0]["id"]
-          print(
-              f"Found App Store Connect iOS pre-release version id: {pre_release_version_id}",
-              file=sys.stderr,
-          )
+              pre_release_version_id = get_ios_pre_release_version_id(headers)
+              if pre_release_version_id is None:
+                  print(
+                      "Uploaded TestFlight builds: none "
+                      f"for iOS version {os.environ['IPA_MARKETING_VERSION']}",
+                      file=sys.stderr,
+                  )
+                  return None
 
-          params = urllib.parse.urlencode({"limit": "200"})
-          url = f"https://api.appstoreconnect.apple.com/v1/preReleaseVersions/{pre_release_version_id}/builds?{params}"
+              print(
+                  f"Found App Store Connect iOS pre-release version id: {pre_release_version_id}",
+                  file=sys.stderr,
+              )
 
-          while url:
-              req = urllib.request.Request(url, headers=headers)
-              with urllib.request.urlopen(req) as resp:
-                  response = json.loads(resp.read().decode("utf-8"))
+              uploaded_build_numbers = get_uploaded_build_numbers(pre_release_version_id, headers)
+              if not uploaded_build_numbers:
+                  print("Uploaded TestFlight builds: none", file=sys.stderr)
+                  return None
 
-              if "errors" in response:
-                  raise SystemExit(f"Failed to check App Store Connect builds: {response}")
+              print(
+                  "Uploaded TestFlight build numbers: "
+                  + ", ".join(uploaded_build_numbers),
+                  file=sys.stderr,
+              )
 
-              for build in response.get("data", []):
-                  existing_value = build.get("attributes", {}).get("version")
-                  if existing_value is None:
-                      continue
+              for uploaded_build_number in uploaded_build_numbers:
+                  if parse_build_number(uploaded_build_number) >= current_build_number:
+                      return uploaded_build_number
 
-                  print(f"Found App Store Connect build number: {existing_value}", file=sys.stderr)
-                  existing = parse_build_number(existing_value)
-                  if existing >= current:
-                      print(existing_value)
-                      raise SystemExit(0)
+              return None
 
-              url = response.get("links", {}).get("next")
+          show_current_and_uploaded_versions()
           PY
-          )
-
-          if [ -n "$BLOCKING_BUILD_NUMBER" ]; then
-            echo "App Store Connect already has build number $BLOCKING_BUILD_NUMBER, which is greater than or equal to current build number $IPA_BUILD_NUMBER."
-            echo "Please update pubspec.yaml version build number to a larger value and keep it aligned with Android before uploading."
-            exit 1
-          fi
-
-          xcrun altool --upload-app \
-            --type ios \
-            --file "$IPA_PATH" \
-            --api-key "$ASC_API_KEY_ID" \
-            --api-issuer "$ASC_API_ISSUER_ID"
   build-android:
     runs-on: self-hosted
     env:
