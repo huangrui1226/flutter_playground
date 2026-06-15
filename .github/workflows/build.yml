@@ -191,43 +191,23 @@ jobs:
               current_build_number = parse_build_number(os.environ["IPA_BUILD_NUMBER"])
               headers = {"Authorization": f"Bearer {os.environ['ASC_JWT']}"}
 
-              print(
-                  "Current IPA version: "
-                  f"{os.environ['IPA_MARKETING_VERSION']} "
-                  f"build {os.environ['IPA_BUILD_NUMBER']}",
-                  file=sys.stderr,
-              )
-
               pre_release_version_id = get_ios_pre_release_version_id(headers)
               if pre_release_version_id is None:
-                  print(
-                      "Uploaded TestFlight builds: none "
-                      f"for iOS version {os.environ['IPA_MARKETING_VERSION']}",
-                      file=sys.stderr,
-                  )
-                  return None
-
-              print(
-                  f"Found App Store Connect iOS pre-release version id: {pre_release_version_id}",
-                  file=sys.stderr,
-              )
+                  print(f"current ipa build: {current_build_number}, Uploaded build number: none, should upload: yes")
+                  return
 
               uploaded_build_numbers = get_uploaded_build_numbers(pre_release_version_id, headers)
               if not uploaded_build_numbers:
-                  print("Uploaded TestFlight builds: none", file=sys.stderr)
-                  return None
+                  print(f"current ipa build: {current_build_number}, Uploaded build number: none, should upload: yes")
+                  return
 
+              uploaded_max_build_number = max(parse_build_number(build_number) for build_number in uploaded_build_numbers)
+              should_upload = "yes" if current_build_number > uploaded_max_build_number else "no"
               print(
-                  "Uploaded TestFlight build numbers: "
-                  + ", ".join(uploaded_build_numbers),
-                  file=sys.stderr,
+                  f"current ipa build: {current_build_number}, "
+                  f"Uploaded build number: {uploaded_max_build_number}, "
+                  f"should upload: {should_upload}"
               )
-
-              for uploaded_build_number in uploaded_build_numbers:
-                  if parse_build_number(uploaded_build_number) >= current_build_number:
-                      return uploaded_build_number
-
-              return None
 
           show_current_and_uploaded_versions()
           PY
