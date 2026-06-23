@@ -7,6 +7,7 @@ import Foundation
 
 import app_settings
 import connectivity_plus
+import display_metrics_macos
 import flutter_blue_plus_darwin
 import flutter_inappwebview_macos
 import path_provider_foundation
@@ -14,6 +15,7 @@ import path_provider_foundation
 func RegisterGeneratedPlugins(registry: FlutterPluginRegistry) {
   AppSettingsPlugin.register(with: registry.registrar(forPlugin: "AppSettingsPlugin"))
   ConnectivityPlusPlugin.register(with: registry.registrar(forPlugin: "ConnectivityPlusPlugin"))
+  DisplayMetricsMacosPlugin.register(with: registry.registrar(forPlugin: "DisplayMetricsMacosPlugin"))
   FlutterBluePlusPlugin.register(with: registry.registrar(forPlugin: "FlutterBluePlusPlugin"))
   InAppWebViewFlutterPlugin.register(with: registry.registrar(forPlugin: "InAppWebViewFlutterPlugin"))
   PathProviderPlugin.register(with: registry.registrar(forPlugin: "PathProviderPlugin"))
