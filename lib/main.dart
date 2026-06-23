@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:display_metrics/display_metrics.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_easyloading/flutter_easyloading.dart';
 import 'package:flutter_playground/pages/home_page.dart';
 import 'package:flutter_playground/utils/file_logger_util.dart';
 
@@ -26,6 +27,7 @@ class MyApp extends StatelessWidget {
     return DisplayMetricsWidget(
       child: MaterialApp(
         home: HomePage(),
+        builder: EasyLoading.init(),
       ),
     );
   }
