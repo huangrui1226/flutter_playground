@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 
-import 'audio_wave_page.dart';
+import 'audio_wave/audio_wave_page.dart';
 import 'connectivity_plus_page.dart';
 import 'display_metrics_page.dart';
 import 'flutter_blue_plus_page.dart';
