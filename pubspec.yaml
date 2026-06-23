@@ -47,6 +47,7 @@ dependencies:
   path_provider:
   dio:
   display_metrics:
+  flutter_easyloading: 3.0.5
 
 dev_dependencies:
   flutter_test:

@@ -4,6 +4,7 @@ import 'audio_wave/audio_wave_page.dart';
 import 'connectivity_plus_page.dart';
 import 'display_metrics_page.dart';
 import 'flutter_blue_plus_page.dart';
+import 'flutter_easyloading/flutter_easyloading_page.dart';
 import 'flutter_inappwebview_page.dart';
 import 'get_page.dart';
 import 'screenshot_page.dart';
@@ -19,7 +20,7 @@ class ThirdPartyPage extends StatelessWidget {
       ),
       body: ListView.builder(
         itemBuilder: _itemBuilder,
-        itemCount: 7,
+        itemCount: 8,
       ),
     );
   }
@@ -85,6 +86,15 @@ class ThirdPartyPage extends StatelessWidget {
           title: Text('display_metrics'),
           onTap: () {
             final destination = DisplayMetricsPage();
+            final route = MaterialPageRoute(builder: (context) => destination);
+            Navigator.push(context, route);
+          },
+        );
+      case 7:
+        return ListTile(
+          title: Text('flutter_easyloading'),
+          onTap: () {
+            final destination = FlutterEasyloadingPage();
             final route = MaterialPageRoute(builder: (context) => destination);
             Navigator.push(context, route);
           },
