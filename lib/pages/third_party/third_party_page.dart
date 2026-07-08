@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import 'audio_wave/audio_wave_page.dart';
+import 'battery_plus_page.dart';
 import 'connectivity_plus_page.dart';
 import 'display_metrics_page.dart';
 import 'flutter_blue_plus_page.dart';
@@ -20,7 +21,7 @@ class ThirdPartyPage extends StatelessWidget {
       ),
       body: ListView.builder(
         itemBuilder: _itemBuilder,
-        itemCount: 8,
+        itemCount: 9,
       ),
     );
   }
@@ -95,6 +96,15 @@ class ThirdPartyPage extends StatelessWidget {
           title: Text('flutter_easyloading'),
           onTap: () {
             final destination = FlutterEasyloadingPage();
+            final route = MaterialPageRoute(builder: (context) => destination);
+            Navigator.push(context, route);
+          },
+        );
+      case 8:
+        return ListTile(
+          title: Text('battery_plus'),
+          onTap: () {
+            final destination = BatteryPlusPage();
             final route = MaterialPageRoute(builder: (context) => destination);
             Navigator.push(context, route);
           },
