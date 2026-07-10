@@ -70,6 +70,8 @@ jobs:
         env:
           CHANGELOG: ${{ github.event.inputs.changelog }}
         run: |
+          date -u
+
           if [ ! -f "$PACKAGE_PATH" ]; then
             echo "Package file not found: $PACKAGE_PATH"
             exit 1
@@ -124,6 +126,8 @@ jobs:
           PGYER_SIGNATURE: ${{ steps.get-pgyer-token.outputs.signature }}
           PGYER_SECURITY_TOKEN: ${{ steps.get-pgyer-token.outputs.security_token }}
         run: |
+          date -u
+
           HTTP_CODE=$(curl -sS -o pgyer-upload-response.txt -w "%{http_code}" \
             -X POST "$PGYER_ENDPOINT" \
             -F "key=$PGYER_KEY" \
