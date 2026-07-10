@@ -8,11 +8,6 @@ on:
         required: true
         default: '- 功能优化和问题修复'
         type: string
-      pgyer_file_path:
-        description: '上传到蒲公英的安装包路径'
-        required: true
-        default: 'build/app/outputs/flutter-apk/app-debug.apk'
-        type: string
 jobs:
   build-ios:
     runs-on: self-hosted
@@ -253,17 +248,18 @@ jobs:
       pgyer_qrcode_url: ${{ steps.wait-pgyer.outputs.pgyer_qrcode_url }}
     steps:
       - uses: actions/checkout@v4
-      - name: Test
+      - name: Build Android apk
         run: |
-          echo build android develop runner
-      - name: Build iOS IPA for TestFlight
-        run: |
+          fvm flutter clean
+          fvm flutter pub get
           fvm flutter build apk
+          PACKAGE_PATH=build/app/outputs/flutter-apk/app-release.apk
+          echo "PACKAGE_PATH=$PACKAGE_PATH"
+          echo "PACKAGE_PATH=$PACKAGE_PATH" >> "$GITHUB_ENV"
       - name: Get Pgyer upload token
         id: get-pgyer-token
         if: env.PGYER_API_KEY != ''
         env:
-          PACKAGE_PATH: ${{ github.event.inputs.pgyer_file_path }}
           CHANGELOG: ${{ github.event.inputs.changelog }}
         run: |
           if [ ! -f "$PACKAGE_PATH" ]; then
@@ -315,7 +311,6 @@ jobs:
       - name: Upload package to Pgyer
         if: steps.get-pgyer-token.outputs.endpoint != ''
         env:
-          PACKAGE_PATH: ${{ github.event.inputs.pgyer_file_path }}
           PGYER_ENDPOINT: ${{ steps.get-pgyer-token.outputs.endpoint }}
           PGYER_KEY: ${{ steps.get-pgyer-token.outputs.key }}
           PGYER_SIGNATURE: ${{ steps.get-pgyer-token.outputs.signature }}
