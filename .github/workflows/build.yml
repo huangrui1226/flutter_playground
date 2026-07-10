@@ -23,32 +23,14 @@ jobs:
       ASC_APPLE_ID: ${{ secrets.ASC_APPLE_ID }}
     steps:
       - uses: actions/checkout@v4
-      - name: Test
+      - name: Build iOS ipa
         run: |
-          echo build ios develop runner
-      - name: Build iOS IPA for TestFlight
-        run: |
-          rm -rf build/ios/archive build/ios/ipa
-
+          fvm flutter clean
           fvm flutter pub get
-          fvm flutter build ipa --release --export-method app-store
-
-          IPA_COUNT=$(find build/ios/ipa -name "*.ipa" -type f | wc -l | tr -d ' ')
-          if [ "$IPA_COUNT" -eq 0 ]; then
-            echo "IPA file not found under build/ios/ipa"
-            exit 1
-          fi
-          if [ "$IPA_COUNT" -gt 1 ]; then
-            echo "Expected exactly one IPA file, found $IPA_COUNT:"
-            find build/ios/ipa -name "*.ipa" -type f
-            exit 1
-          fi
-
+          fvm flutter build ipa --export-method app-store
           IPA_PATH=$(find build/ios/ipa -name "*.ipa" -type f | head -n 1)
           echo "Built IPA: $IPA_PATH"
-
           echo "IPA_PATH=$IPA_PATH" >> "$GITHUB_ENV"
-
       - name: Validate and upload iOS IPA to TestFlight
         run: |
           set -euo pipefail
