@@ -14,7 +14,7 @@ Future<void> main() async {
       runApp(const MyApp());
     },
     (error, stack) {
-      FileLoggerUtil().logUncaughtError(error, stack);afdfd
+      FileLoggerUtil().logUncaughtError(error, stack);
     },
   );
 }
