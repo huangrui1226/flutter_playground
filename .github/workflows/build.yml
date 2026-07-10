@@ -274,6 +274,9 @@ jobs:
       - name: Test
         run: |
           echo build android develop runner
+      - name: Build iOS IPA for TestFlight
+        run: |
+          fvm flutter build apk
       - name: Get Pgyer upload token
         id: get-pgyer-token
         if: env.PGYER_API_KEY != ''
