@@ -41,7 +41,7 @@ Future<void> main() async {
       }
     },
     (error, stack) {
-      FileLoggerUtil().logUncaughtError(error, stack);
+      FileLoggerUtil().logUncaughtError(error, stack);afdfd
     },
   );
 }
