@@ -27,6 +27,12 @@ class _HomePageState extends State<HomePage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      floatingActionButton: FloatingActionButton(
+        onPressed: () {
+          throw StateError('This is test exception');
+        },
+        child: Icon(Icons.error),
+      ),
       appBar: AppBar(
         title: Text('Home Page v${info?.version} ${info?.buildNumber}'),
       ),
