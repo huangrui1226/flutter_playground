@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:io';
 
 import 'package:flutter/foundation.dart';
+import 'package:package_info_plus/package_info_plus.dart';
 import 'package:path_provider/path_provider.dart';
 
 /*
@@ -79,6 +80,8 @@ class FileLoggerUtil {
       logUncaughtError(error, stack);
       return true;
     };
+
+    await _logAppInfo();
   }
 
   /// 记录一条日志（线程安全/串行写）
@@ -171,7 +174,9 @@ class FileLoggerUtil {
       final threshold = DateTime.now().subtract(const Duration(days: 3));
       final entities = await logsDir.list().toList();
       for (final entity in entities) {
-        if (entity is File && entity.path.endsWith('.txt') && entity.path != _file?.path) {
+        if (entity is File &&
+            entity.path.endsWith('.txt') &&
+            entity.path != _file?.path) {
           final stat = await entity.stat();
           if (stat.modified.isBefore(threshold)) {
             await entity.delete();
@@ -187,6 +192,24 @@ class FileLoggerUtil {
   }
 
   // --- 工具方法 ---
+
+  Future<void> _logAppInfo() async {
+    try {
+      final info = await PackageInfo.fromPlatform();
+      log(
+        'AppName: ${info.appName}\n'
+        'PackageName: ${info.packageName}\n'
+        'Version: ${info.version}\n'
+        'BuildNumber: ${info.buildNumber}',
+        tag: 'APP_INFO',
+      );
+    } catch (error, stack) {
+      log(
+        '读取 App 基本信息失败: $error\n$stack',
+        tag: 'APP_INFO',
+      );
+    }
+  }
 
   String _formatTimestamp(DateTime dt) {
     // yyyy-MM-dd-HH-mm-ss

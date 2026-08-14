@@ -48,6 +48,7 @@ dependencies:
   dio:
   display_metrics:
   flutter_easyloading: 3.0.5
+  package_info_plus:
 
 dev_dependencies:
   flutter_test:
