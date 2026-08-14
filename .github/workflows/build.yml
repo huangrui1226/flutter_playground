@@ -9,7 +9,24 @@ on:
         default: '- 功能优化和问题修复'
         type: string
 jobs:
+  checkout:
+    runs-on: self-hosted
+    steps:
+      - uses: actions/checkout@v4
+      - name: pre-build
+        run: |
+          fvm flutter clean
+          fvm flutter pub get
+
   build-ios:
+    needs: checkout
+    runs-on: self-hosted
+    steps:
+      - name: Build iOS ipa
+        run: fvm flutter build ipa --export-method app-store
+
+  upload-ios:
+    needs: build-ios
     runs-on: self-hosted
     env:
       ASC_API_KEY_ID: ${{ secrets.ASC_API_KEY_ID }}
@@ -17,15 +34,6 @@ jobs:
       ASC_API_PRIVATE_KEY_BASE64: ${{ secrets.ASC_API_PRIVATE_KEY_BASE64 }}
       ASC_APPLE_ID: ${{ secrets.ASC_APPLE_ID }}
     steps:
-      - uses: actions/checkout@v4
-      - name: Build iOS ipa
-        run: |
-          fvm flutter clean
-          fvm flutter pub get
-          fvm flutter build ipa --export-method app-store
-          IPA_PATH=$(find build/ios/ipa -name "*.ipa" -type f | head -n 1)
-          echo "Built IPA: $IPA_PATH"
-          echo "IPA_PATH=$IPA_PATH" >> "$GITHUB_ENV"
       - name: Validate and upload iOS IPA to TestFlight
         run: |
           set -euo pipefail
@@ -38,46 +46,40 @@ jobs:
           PRIVATE_KEYS_DIR="$RUNNER_TEMP/appstoreconnect/private_keys"
           mkdir -p "$PRIVATE_KEYS_DIR"
           echo "$ASC_API_PRIVATE_KEY_BASE64" | base64 -D > "$PRIVATE_KEYS_DIR/AuthKey_$ASC_API_KEY_ID.p8"
-
           export API_PRIVATE_KEYS_DIR="$PRIVATE_KEYS_DIR"
 
-          xcrun altool --upload-app \
-            --type ios \
-            --file "$IPA_PATH" \
-            --apple-id "$ASC_APPLE_ID" \
-            --api-key "$ASC_API_KEY_ID" \
-            --api-issuer "$ASC_API_ISSUER_ID"
+          xcrun altool --upload-app --type ios --file build/ios/ipa/flutter_playground.ipa --apple-id "$ASC_APPLE_ID" --api-key "$ASC_API_KEY_ID" --api-issuer "$ASC_API_ISSUER_ID"
+
   build-android:
+    needs: checkout
     runs-on: self-hosted
-    env:
-      PGYER_API_KEY: ${{ secrets.PGYER_API_KEY }}
-    outputs:
-      pgyer_url: ${{ steps.wait-pgyer.outputs.pgyer_url }}
-      pgyer_qrcode_url: ${{ steps.wait-pgyer.outputs.pgyer_qrcode_url }}
     steps:
-      - uses: actions/checkout@v4
       - name: Build Android apk
+        run: fvm flutter build apk
+
+  upload-android:
+    needs: build-android
+    runs-on: self-hosted
+    steps:
+      - name: Get Pgyer upload token
         run: |
-          fvm flutter clean
-          fvm flutter pub get
-          fvm flutter build apk
-          PACKAGE_PATH=build/app/outputs/flutter-apk/app-release.apk
-          echo "PACKAGE_PATH=$PACKAGE_PATH"
-          echo "PACKAGE_PATH=$PACKAGE_PATH" >> "$GITHUB_ENV"
+          set -euo pipefail
+          pgyer upload build/app/outputs/flutter-apk/app-release.apk
+
   notify-feishu:
     name: Notify Feishu
     runs-on: self-hosted
     needs:
-      - build-ios
-      - build-android
+      - upload-ios
+      - upload-android
     if: always()
     env:
       FEISHU_BOT_WEBHOOK: ${{ secrets.FEISHU_BOT_WEBHOOK }}
       FEISHU_BOT_SECRET: ${{ secrets.FEISHU_BOT_SECRET }}
-      IOS_RESULT: ${{ needs.build-ios.result }}
-      ANDROID_RESULT: ${{ needs.build-android.result }}
-      PGYER_URL: ${{ needs.build-android.outputs.pgyer_url }}
-      PGYER_QRCODE_URL: ${{ needs.build-android.outputs.pgyer_qrcode_url }}
+      IOS_RESULT: ${{ needs.upload-ios.result }}
+      ANDROID_RESULT: ${{ needs.upload-android.result }}
+      PGYER_URL: ${{ needs.upload-android.outputs.pgyer_url }}
+      PGYER_QRCODE_URL: ${{ needs.upload-android.outputs.pgyer_qrcode_url }}
       CHANGELOG: ${{ github.event.inputs.changelog }}
       WORKFLOW_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
       REPOSITORY: ${{ github.repository }}
