@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter_playground/utils/toast_util.dart';
 
 class FlutterEasyloadingPage extends StatefulWidget {

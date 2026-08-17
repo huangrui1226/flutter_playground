@@ -1,7 +1,7 @@
 import 'dart:async';
 
 import 'package:audio_waveforms/audio_waveforms.dart';
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter_playground/pages/third_party/audio_wave/audio_input_view.dart';
 
 class AudioWavePage extends StatefulWidget {

@@ -1,5 +1,5 @@
 import 'package:display_metrics/display_metrics.dart';
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 
 class DisplayMetricsPage extends StatelessWidget {
   const DisplayMetricsPage({super.key});
