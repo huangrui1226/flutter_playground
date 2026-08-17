@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:display_metrics/display_metrics.dart';
+import 'package:flutter/foundation.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:flutter_easyloading/flutter_easyloading.dart';
 import 'package:flutter_playground/pages/home_page.dart';
@@ -11,7 +12,9 @@ Future<void> main() async {
   runZonedGuarded(
     () async {
       WidgetsFlutterBinding.ensureInitialized();
-      await FileLoggerUtil().init();
+      if (!kIsWeb) {
+        await FileLoggerUtil().init();
+      }
       await SentryFlutter.init(
     (options) {
       options.dsn = 'https://a4789d0beb49453a0ccb5fb618bc59af@o4510661938642944.ingest.us.sentry.io/4511908428709888';
