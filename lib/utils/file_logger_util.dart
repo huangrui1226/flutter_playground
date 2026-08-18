@@ -53,7 +53,12 @@ class FileLoggerUtil {
 
     _launchTimestamp = _formatTimestamp(DateTime.now()); // yyyy-MM-dd-HH-mm-ss
 
-    final dir = await getApplicationDocumentsDirectory();
+    final Directory dir;
+    if (Platform.isWindows) {
+      dir = await getApplicationSupportDirectory();
+    } else {
+      dir = await getApplicationDocumentsDirectory();
+    }
     final logsDir = Directory('${dir.path}/logs');
     if (!await logsDir.exists()) {
       await logsDir.create(recursive: true);
