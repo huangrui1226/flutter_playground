@@ -1,5 +1,5 @@
-import 'package:material_ui/material_ui.dart';
 import 'package:flutter_playground/utils/file_logger_util.dart';
+import 'package:material_ui/material_ui.dart';
 
 class FileLoggerUtilPage extends StatefulWidget {
   const FileLoggerUtilPage({super.key});
@@ -29,6 +29,7 @@ class _FileLoggerUtilPageState extends State<FileLoggerUtilPage> {
       child: Padding(
         padding: const EdgeInsets.all(8.0),
         child: Column(
+          spacing: 8,
           crossAxisAlignment: .start,
           children: [
             ElevatedButton(
@@ -39,6 +40,18 @@ class _FileLoggerUtilPageState extends State<FileLoggerUtilPage> {
                 FileLoggerUtil().log(message);
               },
               child: Text("Log time"),
+            ),
+            ElevatedButton(
+              onPressed: () {
+                FileLoggerUtil().zipLogFile();
+              },
+              child: Text("Zip"),
+            ),
+            ElevatedButton(
+              onPressed: () {
+                FileLoggerUtil().keepLatestLog();
+              },
+              child: Text("keepLatestLog"),
             ),
           ],
         ),

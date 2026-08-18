@@ -50,6 +50,7 @@ dependencies:
   display_metrics:
   flutter_easyloading:
   package_info_plus:
+  archive:
 
   material_ui: any
 dev_dependencies:
