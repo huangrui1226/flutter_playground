@@ -54,17 +54,23 @@ class FileLoggerUtil {
     _launchTimestamp = _formatTimestamp(DateTime.now()); // yyyy-MM-dd-HH-mm-ss
 
     final Directory dir;
+    final Directory logsDir;
     if (Platform.isWindows) {
       dir = await getApplicationSupportDirectory();
+      logsDir = Directory('${dir.path}\\logs');
     } else {
       dir = await getApplicationDocumentsDirectory();
+      logsDir = Directory('${dir.path}/logs');
     }
-    final logsDir = Directory('${dir.path}/logs');
     if (!await logsDir.exists()) {
       await logsDir.create(recursive: true);
     }
 
-    _file = File('${logsDir.path}/$_launchTimestamp.txt');
+    if (Platform.isWindows) {
+      _file = File('${logsDir.path}\\$_launchTimestamp.txt');
+    } else {
+      _file = File('${logsDir.path}/$_launchTimestamp.txt');
+    }
     _sink = _file!.openWrite(mode: FileMode.append);
 
     // 自动清理超过 7 天的旧日志文件
