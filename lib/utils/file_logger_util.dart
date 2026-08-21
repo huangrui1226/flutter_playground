@@ -1,7 +1,9 @@
 import 'dart:async';
 import 'dart:io';
 
+import 'package:archive/archive_io.dart';
 import 'package:flutter/foundation.dart';
+import 'package:package_info_plus/package_info_plus.dart';
 import 'package:path_provider/path_provider.dart';
 
 /*
@@ -51,13 +53,24 @@ class FileLoggerUtil {
 
     _launchTimestamp = _formatTimestamp(DateTime.now()); // yyyy-MM-dd-HH-mm-ss
 
-    final dir = await getApplicationDocumentsDirectory();
-    final logsDir = Directory('${dir.path}/logs');
+    final Directory dir;
+    final Directory logsDir;
+    if (Platform.isWindows) {
+      dir = await getApplicationSupportDirectory();
+      logsDir = Directory('${dir.path}\\logs');
+    } else {
+      dir = await getApplicationDocumentsDirectory();
+      logsDir = Directory('${dir.path}/logs');
+    }
     if (!await logsDir.exists()) {
       await logsDir.create(recursive: true);
     }
 
-    _file = File('${logsDir.path}/$_launchTimestamp.txt');
+    if (Platform.isWindows) {
+      _file = File('${logsDir.path}\\$_launchTimestamp.txt');
+    } else {
+      _file = File('${logsDir.path}/$_launchTimestamp.txt');
+    }
     _sink = _file!.openWrite(mode: FileMode.append);
 
     // 自动清理超过 7 天的旧日志文件
@@ -79,6 +92,8 @@ class FileLoggerUtil {
       logUncaughtError(error, stack);
       return true;
     };
+
+    await _logAppInfo();
   }
 
   /// 记录一条日志（线程安全/串行写）
@@ -103,42 +118,63 @@ class FileLoggerUtil {
     _logCrashSync('UncaughtError: $error\n$stack');
   }
 
-  /// 只保留最新的日志文件，其他的删除
+  /// 只保留当前日志文件，其他的删除
   Future<void> keepLatestLog() async {
-    if (currentLogPath == null) {
-      return;
-    }
-    final logsDir = Directory(currentLogPath!);
+    final currentFile = _file;
+    if (currentFile == null) return;
+
     try {
-      final entities = await logsDir.list().toList();
+      await for (final entity in currentFile.parent.list()) {
+        if (entity is File && entity.path.endsWith('.txt') && entity.path != currentFile.path) {
+          try {
+            await entity.delete();
+            debugPrint(
+              '[AppFileLogger] 已删除旧日志: ${entity.uri.pathSegments.last}',
+            );
+          } catch (e) {
+            debugPrint('[AppFileLogger] 删除日志失败: ${entity.path} -> $e');
+          }
+        }
+      }
+    } catch (e) {
+      debugPrint('[AppFileLogger] 保留当前日志失败: $e');
+    }
+  }
+
+  /// 压缩日志文件
+  Future<File?> zipLogFile() async {
+    final currentFile = _file;
+    if (currentFile == null) return null;
+
+    ZipFileEncoder? encoder;
+    try {
+      await _sink?.flush();
+
       final logFiles = <File>[];
-      for (final entity in entities) {
+      await for (final entity in currentFile.parent.list()) {
         if (entity is File && entity.path.endsWith('.txt')) {
           logFiles.add(entity);
         }
       }
-      if (logFiles.length <= 1) return;
+      if (logFiles.isEmpty) return null;
 
-      logFiles.sort((a, b) {
-        final aStat = a.statSync().modified;
-        final bStat = b.statSync().modified;
-        return bStat.compareTo(aStat);
-      });
+      logFiles.sort((a, b) => a.path.compareTo(b.path));
 
-      final latestPath = _file?.path ?? logFiles.first.path;
-      for (final file in logFiles) {
-        if (file.path == latestPath) continue;
-        try {
-          await file.delete();
-          debugPrint(
-            '[AppFileLogger] 已删除旧日志: ${file.path.split('/').last}',
-          );
-        } catch (e) {
-          debugPrint('[AppFileLogger] 删除日志失败: ${file.path} -> $e');
-        }
+      final tempDir = await getTemporaryDirectory();
+      final zipPath = '${tempDir.path}/logs_${DateTime.now().millisecondsSinceEpoch}.zip';
+      encoder = ZipFileEncoder()..create(zipPath);
+      for (final logFile in logFiles) {
+        await encoder.addFile(logFile, logFile.uri.pathSegments.last);
       }
-    } catch (e) {
-      debugPrint('[AppFileLogger] 保留最新日志失败: $e');
+      encoder.close();
+      encoder = null;
+
+      return File(zipPath);
+    } catch (e, stack) {
+      debugPrint('[AppFileLogger] 压缩日志失败: $e\n$stack');
+      return null;
+    } finally {
+      encoder?.close();
     }
   }
 
@@ -187,6 +223,24 @@ class FileLoggerUtil {
   }
 
   // --- 工具方法 ---
+
+  Future<void> _logAppInfo() async {
+    try {
+      final info = await PackageInfo.fromPlatform();
+      log(
+        'AppName: ${info.appName}\n'
+        'PackageName: ${info.packageName}\n'
+        'Version: ${info.version}\n'
+        'BuildNumber: ${info.buildNumber}',
+        tag: 'APP_INFO',
+      );
+    } catch (error, stack) {
+      log(
+        '读取 App 基本信息失败: $error\n$stack',
+        tag: 'APP_INFO',
+      );
+    }
+  }
 
   String _formatTimestamp(DateTime dt) {
     // yyyy-MM-dd-HH-mm-ss

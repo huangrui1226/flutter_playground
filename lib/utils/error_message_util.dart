@@ -24,6 +24,8 @@ String dioErrorToMessage(Object error) {
         return '网络连接失败，请检查网络后重试';
       case DioExceptionType.unknown:
         return '网络异常，请稍后重试';
+      case DioExceptionType.transformTimeout:
+        return '数据处理超时，请稍后重试';
     }
   }
   return error.toString();

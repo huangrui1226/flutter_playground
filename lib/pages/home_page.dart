@@ -1,17 +1,40 @@
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
+import 'package:package_info_plus/package_info_plus.dart';
 
 import 'convert/convert_page.dart';
 import 'third_party/third_party_page.dart';
 import 'utils/utils_page.dart';
 
-class HomePage extends StatelessWidget {
+class HomePage extends StatefulWidget {
   const HomePage({super.key});
+
+  @override
+  State<HomePage> createState() => _HomePageState();
+}
+
+class _HomePageState extends State<HomePage> {
+  PackageInfo? info;
+
+  @override
+  void initState() {
+    super.initState();
+    PackageInfo.fromPlatform().then((value) {
+      info = value;
+      setState(() {});
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      floatingActionButton: FloatingActionButton(
+        onPressed: () {
+          throw StateError('This is test exception');
+        },
+        child: Icon(Icons.error),
+      ),
       appBar: AppBar(
-        title: Text('Home Page'),
+        title: Text('Home Page v${info?.version} ${info?.buildNumber}'),
       ),
       body: ListView.builder(
         itemBuilder: _itemBuilder,

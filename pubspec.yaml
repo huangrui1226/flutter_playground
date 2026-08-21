@@ -16,11 +16,11 @@ publish_to: 'none' # Remove this line if you wish to publish to pub.dev
 # https://developer.apple.com/library/archive/documentation/General/Reference/InfoPlistKeyReference/Articles/CoreFoundationKeys.html
 # In Windows, build-name is used as the major, minor, and patch parts
 # of the product and file versions while build-number is used as the build suffix.
-version: 1.0.0+1
+version: 1.0.0+10
 
 environment:
-  sdk: ^3.10.0
-  flutter: ^3.38.0
+  sdk: 3.13.0
+  flutter: 3.47.0
 
 # Dependencies specify other packages that your package needs in order to work.
 # To automatically upgrade your package dependencies to the latest versions
@@ -29,6 +29,7 @@ environment:
 # the latest version available on pub.dev. To see which dependencies have newer
 # versions available, run `flutter pub outdated`.
 dependencies:
+  sentry_flutter: ^9.27.0
   flutter:
     sdk: flutter
 
@@ -47,9 +48,13 @@ dependencies:
   path_provider:
   dio:
   display_metrics:
-  flutter_easyloading: 3.0.5
+  flutter_easyloading:
+  package_info_plus:
+  archive:
 
+  material_ui: any
 dev_dependencies:
+  sentry_dart_plugin: ^3.4.0
   flutter_test:
     sdk: flutter
 
@@ -101,3 +106,9 @@ flutter:
   #
   # For details regarding fonts from package dependencies,
   # see https://flutter.dev/to/font-from-package
+
+sentry:
+  upload_debug_symbols: true
+  upload_source_maps: true
+  project: flutter-playground
+  org: huangrui
