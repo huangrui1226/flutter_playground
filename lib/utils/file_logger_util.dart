@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:io';
 
 import 'package:archive/archive_io.dart';
+import 'package:device_info_plus/device_info_plus.dart';
 import 'package:flutter/foundation.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:path_provider/path_provider.dart';
@@ -226,12 +227,33 @@ class FileLoggerUtil {
 
   Future<void> _logAppInfo() async {
     try {
+      String brand = '';
+      String model = '';
+      String systemVersion = '';
+
+      final deviceInfo = DeviceInfoPlugin();
       final info = await PackageInfo.fromPlatform();
+
+      if (Platform.isAndroid) {
+        final androidInfo = await deviceInfo.androidInfo;
+        brand = androidInfo.brand; // 品牌，如 samsung, xiaomi
+        model = androidInfo.model; // 设备型号，如 SM-G950F
+        systemVersion = 'Android ${androidInfo.version.release}'; // 如 Android 13
+      } else if (Platform.isIOS) {
+        final iosInfo = await deviceInfo.iosInfo;
+        brand = 'Apple';
+        model = iosInfo.utsname.machine; // 如 iPhone14,2
+        systemVersion = 'iOS ${iosInfo.systemVersion}'; // 如 iOS 17.0
+      }
       log(
-        'AppName: ${info.appName}\n'
-        'PackageName: ${info.packageName}\n'
-        'Version: ${info.version}\n'
-        'BuildNumber: ${info.buildNumber}',
+        '\n'
+            '品牌: $brand\n'
+            '设备型号：$model\n'
+            '系统版本：$systemVersion\n'
+            '应用名称: ${info.appName}\n'
+            '应用包名: ${info.packageName}\n'
+            '应用版本: ${info.version}\n'
+            'build 版本: ${info.buildNumber}',
         tag: 'APP_INFO',
       );
     } catch (error, stack) {

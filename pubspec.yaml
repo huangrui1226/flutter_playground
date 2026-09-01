@@ -51,7 +51,7 @@ dependencies:
   flutter_easyloading:
   package_info_plus:
   archive:
-
+  device_info_plus:
   material_ui: any
 dev_dependencies:
   sentry_dart_plugin: ^3.4.0
